@@ -3,3 +3,24 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      - NEO4J_AUTH=neo4j/Password123
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j-data:/data
+
+  neo4j-provisioning:
+    image: neo4j:5-community
+    volumes:
+      - ./dev/neo4j/initMovieDb.cql:/initMovieDb.cql
+      - ./dev/neo4j/wait-for.sh:/wait-for.sh
+    entrypoint: []
+    command: /bin/sh -c '/wait-for.sh http://neo4j:7474 -- cypher-shell -a neo4j://neo4j:7687 -u neo4j -p Password123 -f /initMovieDb.cql'
+
+volumes:
+  neo4j-data:
