@@ -23,13 +23,20 @@ export const LeftSidebar = ({ headers }: { headers: SidebarHeader[] }) => {
         {headers.map((header) => (
           <div key={header.id} data-testid={`${header.label}-sidebar`}>
             <Icon name="circle" size="xs" />
-            <LinkButton variant="secondary" fill="text" onClick={scrollTo(header.id)}>
+            <LinkButton
+              style={header.isOptional ? { padding: '5px 15px', height: '50px', width: '225px' } : {}}
+              variant="secondary"
+              fill="text"
+              onClick={scrollTo(header.id)}
+            >
               <div className={styles.sidebarText}>
                 <div className={styles.sidebarLabel}>{header.label}</div>
                 {header.isOptional && (
-                  <Text color="secondary" variant="sm">
-                    optional
-                  </Text>
+                  <div className={styles.sidebarOptional}>
+                    <Text color="secondary" variant="sm">
+                      optional
+                    </Text>
+                  </div>
                 )}
               </div>
             </LinkButton>
@@ -46,8 +53,16 @@ const getStyles = () => ({
     position: 'sticky',
     top: 0,
     alignSelf: 'flex-start',
-    minWidth: '200px',
+    flexShrink: 0,
+    minWidth: '240px',
   }),
   sidebarText: css({ display: 'flex', flexDirection: 'column' }),
-  sidebarLabel: css({ display: 'flex', alignItems: 'center', lineHeight: 1 }),
+  sidebarLabel: css({
+    display: 'flex',
+    alignItems: 'center',
+    lineHeight: 1.2,
+    whiteSpace: 'normal',
+    textAlign: 'left',
+  }),
+  sidebarOptional: css({ marginTop: 0, marginBottom: 0, lineHeight: 1 }),
 });
