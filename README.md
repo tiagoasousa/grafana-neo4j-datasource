@@ -1,136 +1,99 @@
-# Grafana data source plugin template
+# Neo4j data source for Grafana
 
-This template is a starting point for building a Data Source Plugin for Grafana.
+Run [Cypher](https://neo4j.com/docs/cypher-manual/current/) queries against a [Neo4j](https://neo4j.com/) database from Grafana, over the Bolt protocol.
 
-## What are Grafana data source plugins?
+## Overview
 
-Grafana supports a wide range of data sources, including Prometheus, MySQL, and even Datadog. There’s a good chance you can already visualize metrics from the systems you have set up. In some cases, though, you already have an in-house metrics solution that you’d like to add to your Grafana dashboards. Grafana Data Source Plugins enables integrating such solutions with Grafana.
+The data source connects to Neo4j over Bolt and returns query results as Grafana data frames.
 
-## Getting started
+**Features**
 
-### Backend
+- Cypher queries over Bolt (`neo4j://` or `bolt://` URLs)
+- Two result formats: **Table** and **Node Graph**
+- Per-query database selection
+- Grafana Private Data Source Connect (PDC) support via the secure SOCKS proxy
+- Template-variable interpolation in queries, including the `${__from}` and `${__to}` time macros
 
-1. Update [Grafana plugin SDK for Go](https://grafana.com/developers/plugin-tools/key-concepts/backend-plugins/grafana-plugin-sdk-for-go) dependency to the latest minor version:
+## Configuration
 
-   ```bash
-   go get -u github.com/grafana/grafana-plugin-sdk-go
-   go mod tidy
-   ```
+| Field | Description |
+| ----- | ----------- |
+| **URL** | Bolt address, e.g. `neo4j://localhost:7687` |
+| **Database** | Optional Neo4j database name. Leave empty to use the server's default database |
+| **Username** | Neo4j user for basic authentication. Leave empty for no authentication |
+| **Password** | Password for the user above. Leave empty for no authentication |
+| **Secure SOCKS Proxy** | Enable when connecting through Grafana Private Data Source Connect (see below) |
 
-2. Build plugin backend binaries for Linux, Windows and Darwin:
+## Private Data Source Connect (PDC)
 
-   ```bash
-   mage -v
-   ```
+To reach a Neo4j server on a private network from Grafana Cloud, enable **Secure SOCKS Proxy** and configure a [Private Data Source Connect](https://grafana.com/docs/grafana-cloud/connect-externally-hosted/private-data-source-connect/) agent for that network.
 
-3. List all available Mage targets for additional commands:
+- The Grafana instance must have the `secureSocksDSProxyEnabled` feature toggle enabled for the toggle to appear.
+- In PDC mode the Bolt connection is tunneled through the SOCKS proxy, which is already encrypted end-to-end. Driver-level TLS Bolt URLs (`neo4j+s://`, `neo4j+ssc://`, `bolt+s://`, `bolt+ssc://`) are **not supported** in this mode — use a plain `neo4j://` or `bolt://` URL.
 
-   ```bash
-   mage -l
-   ```
+## Node Graph format
 
-### Frontend
+Set the query **Format** to **Node Graph** and return nodes and/or relationships. Each row of the result is inspected: returned nodes become graph nodes, and returned relationships become edges between the returned nodes.
 
-1. Install dependencies
+Node Graph styling is driven by node and relationship **properties**. A node property named after one of the Node Graph optional fields styles the node directly; all other properties are shown in the node's details panel.
 
-   ```bash
-   npm install
-   ```
+Node optional fields (set as node properties):
 
-2. Build plugin in development mode and run in watch mode
+- `color`
+- `mainstat`
+- `secondarystat`
+- `subtitle`
+- `icon`
+- `nodeRadius`
+- `highlighted`
+- `arc__*` — arc segments, e.g. `arc__cpu` (node-only)
 
-   ```bash
-   npm run dev
-   ```
+Edge optional fields (set as relationship properties): `secondarystat`, `thickness`, `color`, `strokeDasharray`, `highlighted`.
 
-3. Build plugin in production mode
+A node's `title` property overrides its label as the displayed name.
 
-   ```bash
-   npm run build
-   ```
+Example:
 
-4. Run the tests (using Jest)
+```cypher
+MATCH (p:Person)-[r:ACTED_IN]->(m:Movie)
+RETURN p, r, m
+```
 
-   ```bash
-   # Runs the tests and watches for changes, requires git init first
-   npm run test
+## Time filtering
 
-   # Exits after running all the tests
-   npm run test:ci
-   ```
+`${__from}` and `${__to}` interpolate to the dashboard time range as epoch milliseconds. Use them in `WHERE` clauses against millisecond-epoch properties:
 
-5. Spin up a Grafana instance and run the plugin inside it (using Docker)
+```cypher
+MATCH (e:Event)
+WHERE e.ts >= ${__from} AND e.ts <= ${__to}
+RETURN e
+```
 
-   ```bash
-   npm run server
-   ```
+For formatted dates, use Grafana's date formatting, e.g. `${__from:date:YYYY-MM-DD}`.
 
-6. Run the E2E tests (using Playwright)
+Dashboard template variables are interpolated into the query text as well.
 
-   ```bash
-   # Spins up a Grafana instance first that we tests against
-   npm run server
+## Per-query database
 
-   # If you wish to start a certain Grafana version. If not specified will use latest by default
-   GRAFANA_VERSION=11.3.0 npm run server
+The **Database** field in the query editor overrides the data source's configured database for that query only. Leave it empty to use the data source setting.
 
-   # Starts the tests
-   npm run e2e
-   ```
+## Development
 
-7. Run the linter
+The repository ships a Docker Compose development environment with Neo4j and Grafana.
 
-   ```bash
-   npm run lint
+```bash
+# start Neo4j and load the development seed data
+docker compose up -d neo4j
+docker compose up neo4j-provisioning
 
-   # or
+# run the Go test suite (expects Neo4j on localhost:7687, user neo4j / Password123)
+export GOTOOLCHAIN=auto
+go test ./... -count=1
 
-   npm run lint:fix
-   ```
+# build the frontend into dist/
+npm install
+npm run build
 
-# Distributing your plugin
-
-When distributing a Grafana plugin either within the community or privately the plugin must be signed so the Grafana application can verify its authenticity. This can be done with the `@grafana/sign-plugin` package.
-
-_Note: It's not necessary to sign a plugin during development. The docker development environment that is scaffolded with `@grafana/create-plugin` caters for running the plugin without a signature._
-
-## Initial steps
-
-Before signing a plugin please read the Grafana [plugin publishing and signing criteria](https://grafana.com/legal/plugins/#plugin-publishing-and-signing-criteria) documentation carefully.
-
-`@grafana/create-plugin` has added the necessary commands and workflows to make signing and distributing a plugin via the grafana plugins catalog as straightforward as possible.
-
-Before signing a plugin for the first time please consult the Grafana [plugin signature levels](https://grafana.com/legal/plugins/#what-are-the-different-classifications-of-plugins) documentation to understand the differences between the types of signature level.
-
-1. Create a [Grafana Cloud account](https://grafana.com/signup).
-2. Make sure that the first part of the plugin ID matches the slug of your Grafana Cloud account.
-   - _You can find the plugin ID in the `plugin.json` file inside your plugin directory. For example, if your account slug is `acmecorp`, you need to prefix the plugin ID with `acmecorp-`._
-3. Create a Grafana Cloud API key with the `PluginPublisher` role.
-4. Keep a record of this API key as it will be required for signing a plugin
-
-## Signing a plugin
-
-### Using Github actions release workflow
-
-If the plugin is using the github actions supplied with `@grafana/create-plugin` signing a plugin is included out of the box. The [release workflow](./.github/workflows/release.yml) can prepare everything to make submitting your plugin to Grafana as easy as possible. Before being able to sign the plugin however a secret needs adding to the Github repository.
-
-1. Please navigate to "settings > secrets > actions" within your repo to create secrets.
-2. Click "New repository secret"
-3. Name the secret "GRAFANA_API_KEY"
-4. Paste your Grafana Cloud API key in the Secret field
-5. Click "Add secret"
-
-#### Push a version tag
-
-To trigger the workflow we need to push a version tag to github. This can be achieved with the following steps:
-
-1. Run `npm version <major|minor|patch>`
-2. Run `git push origin main --follow-tags`
-
-## Learn more
-
-Below you can find source code for existing app plugins and other related documentation.
-
-- [Basic data source plugin example](https://github.com/grafana/grafana-plugin-examples/tree/master/examples/datasource-basic#readme)
-- [`plugin.json` documentation](https://grafana.com/developers/plugin-tools/reference/plugin-json)
-- [How to sign a plugin?](https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin)
+# run Grafana with the plugin loaded (after npm run build)
+npm run server
+```

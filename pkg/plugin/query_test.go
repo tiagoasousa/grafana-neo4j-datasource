@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -44,11 +45,55 @@ func runIntegrationQuery(t *testing.T, cypher, format string) backend.DataRespon
 	return ds.query(context.Background(), backend.DataQuery{RefID: "A", JSON: raw})
 }
 
+// probeNodeRelIds returns the internal and element ids of the
+// Keanu Reeves --ACTED_IN--> The Matrix pattern from the dev seed. Both id
+// kinds depend on the database instance (element ids embed the database
+// UUID, internal ids depend on creation order), so tests must never
+// hard-code them; build expectations from the probed values instead.
+func probeNodeRelIds(t *testing.T) (pid int64, peid string, rid int64, reid string, mid int64, meid string) {
+	t.Helper()
+	res := runIntegrationQuery(t,
+		"MATCH (p:Person {name:'Keanu Reeves'})-[r:ACTED_IN]->(m:Movie {title:'The Matrix'}) "+
+			"RETURN id(p) AS pid, elementId(p) AS peid, id(r) AS rid, elementId(r) AS reid, id(m) AS mid, elementId(m) AS meid",
+		formatTable)
+	if len(res.Frames) != 1 || res.Frames[0].Rows() != 1 {
+		t.Fatalf("id probe: expected 1 frame with 1 row, got %d frames (error: %v)", len(res.Frames), res.Error)
+	}
+	frame := res.Frames[0]
+	field := func(name string) any {
+		for _, f := range frame.Fields {
+			if f.Name == name {
+				return f.At(0)
+			}
+		}
+		t.Fatalf("id probe: no field %q", name)
+		return nil
+	}
+	asInt := func(name string) int64 {
+		v, _ := field(name).(*int64)
+		if v == nil {
+			t.Fatalf("id probe: %q is not an integer: %v", name, field(name))
+		}
+		return *v
+	}
+	asStr := func(name string) string {
+		v, _ := field(name).(*string)
+		if v == nil {
+			t.Fatalf("id probe: %q is not a string: %v", name, field(name))
+		}
+		return *v
+	}
+	return asInt("pid"), asStr("peid"), asInt("rid"), asStr("reid"), asInt("mid"), asStr("meid")
+}
+
 func TestTableFormat(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
 	_ = dbtype.Node{} // keep the dbtype import honest for future graph tests
+	pid, peid, rid, reid, mid, meid := probeNodeRelIds(t)
+	nodeJSON := fmt.Sprintf(`{"Id":%d,"ElementId":"%s","Labels":["Movie"],"Props":{"released":1999,"tagline":"Welcome to the Real World","title":"The Matrix"}}`, mid, meid)
+	relJSON := fmt.Sprintf(`{"Id":%d,"ElementId":"%s","StartId":%d,"StartElementId":"%s","EndId":%d,"EndElementId":"%s","Type":"ACTED_IN","Props":{"roles":["Neo"]}}`, rid, reid, pid, peid, mid, meid)
 	cases := []struct {
 		name     string
 		cypher   string
@@ -80,9 +125,9 @@ func TestTableFormat(t *testing.T) {
 		{"duration as string", "return duration(\"PT3M\") as A",
 			data.NewFrame("response", data.NewField("A", nil, []*string{ptrS("PT3M")}))},
 		{"node as json", "Match(m:Movie) where m.title = 'The Matrix' return m limit 1",
-			data.NewFrame("response", data.NewField("m", nil, []*string{ptrS("{\"Id\":0,\"ElementId\":\"4:0e328ed8-939c-4e4f-ae9a-3fdec9079c6e:0\",\"Labels\":[\"Movie\"],\"Props\":{\"released\":1999,\"tagline\":\"Welcome to the Real World\",\"title\":\"The Matrix\"}}")}))},
+			data.NewFrame("response", data.NewField("m", nil, []*string{ptrS(nodeJSON)}))},
 		{"relationship as json", "MATCH (p:Person)-[r:ACTED_IN]->(m:Movie) where m.title = 'The Matrix' AND p.name = 'Keanu Reeves' RETURN r LIMIT 1",
-			data.NewFrame("response", data.NewField("r", nil, []*string{ptrS("{\"Id\":0,\"ElementId\":\"5:0e328ed8-939c-4e4f-ae9a-3fdec9079c6e:0\",\"StartId\":1,\"StartElementId\":\"4:0e328ed8-939c-4e4f-ae9a-3fdec9079c6e:1\",\"EndId\":0,\"EndElementId\":\"4:0e328ed8-939c-4e4f-ae9a-3fdec9079c6e:0\",\"Type\":\"ACTED_IN\",\"Props\":{\"roles\":[\"Neo\"]}}")}))},
+			data.NewFrame("response", data.NewField("r", nil, []*string{ptrS(relJSON)}))},
 		{"dotted column name", "Match(m:Movie) where m.title = 'The Matrix' return m.title limit 1",
 			data.NewFrame("response", data.NewField("m.title", nil, []*string{ptrS("The Matrix")}))},
 	}

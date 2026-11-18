@@ -7,16 +7,25 @@
   "backend": true,
   "executable": "gpx_neo4j_datasource",
   "info": {
-    "description": "",
+    "description": "Query Neo4j over Bolt with Cypher; table and Node Graph formats; Grafana Private Data Source Connect (PDC) support",
     "author": {
-      "name": "Tiagoasousa"
+      "name": "Tiago Sousa"
     },
-    "keywords": ["datasource"],
+    "keywords": ["neo4j", "cypher", "graph", "pdc"],
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
     },
-    "links": [],
+    "links": [
+      {
+        "name": "Website",
+        "url": "https://github.com/tiagoasousa/grafana-neo4j-datasource"
+      },
+      {
+        "name": "README",
+        "url": "https://github.com/tiagoasousa/grafana-neo4j-datasource"
+      }
+    ],
     "screenshots": [],
     "version": "%VERSION%",
     "updated": "%TODAY%"

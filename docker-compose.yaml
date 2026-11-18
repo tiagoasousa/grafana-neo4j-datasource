@@ -17,10 +17,9 @@ services:
   neo4j-provisioning:
     image: neo4j:5-community
     volumes:
-      - ./dev/neo4j/initMovieDb.cql:/initMovieDb.cql
-      - ./dev/neo4j/wait-for.sh:/wait-for.sh
+      - ./dev/neo4j/seed.cql:/seed.cql
     entrypoint: []
-    command: /bin/sh -c '/wait-for.sh http://neo4j:7474 -- cypher-shell -a neo4j://neo4j:7687 -u neo4j -p Password123 -f /initMovieDb.cql'
+    command: /bin/sh -c 'until cypher-shell -a neo4j://neo4j:7687 -u neo4j -p Password123 "RETURN 1" >/dev/null 2>&1; do sleep 2; done && cypher-shell -a neo4j://neo4j:7687 -u neo4j -p Password123 -f /seed.cql'
 
 volumes:
   neo4j-data:
