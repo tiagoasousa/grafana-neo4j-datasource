@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+
+- Config editor redesigned to the modern Grafana layout: a sticky left sidebar
+  ("Connect data source") with scroll-to-section navigation beside titled,
+  described sections (Connection, Authentication, Private data source connect).
+- Plugin display name shortened to "Neo4j".
+
 ## 1.0.2
 
 - Modernize the data source configuration editor to the current Grafana UI
