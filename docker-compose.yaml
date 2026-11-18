@@ -3,6 +3,19 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    environment:
+      GF_FEATURE_TOGGLES_ENABLE: secureSocksDSProxyEnabled
+      # local stand-in for Grafana Cloud's PDC SOCKS endpoint
+      GF_SECURE_SOCKS_DATASOURCE_PROXY_ENABLED: "true"
+      GF_SECURE_SOCKS_DATASOURCE_PROXY_PROXY_ADDRESS: socks:5555
+      GF_SECURE_SOCKS_DATASOURCE_PROXY_ALLOW_INSECURE: "true"
+    depends_on:
+      - neo4j
+      - socks
+
+  socks:
+    build: ./dev/socks
+    command: ["-i", "0.0.0.0", "-p", "5555"]
 
   neo4j:
     image: neo4j:5-community
