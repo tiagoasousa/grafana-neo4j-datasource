@@ -21,7 +21,7 @@ func authTokenFor(s *models.PluginSettings) neo4j.AuthToken {
 // Private Data Source Connect) is enabled for this data source, the driver
 // connects to a local relay that tunnels every connection through the SOCKS
 // proxy to the configured Neo4j address.
-func createDriver(ctx context.Context, s *models.PluginSettings, proxyOpts *proxy.Options) (neo4j.DriverWithContext, *socksRelay, error) {
+func createDriver(ctx context.Context, s *models.PluginSettings, proxyOpts *proxy.Options) (neo4j.Driver, *socksRelay, error) {
 	proxyClient := proxy.New(proxyOpts)
 	if proxyClient.SecureSocksProxyEnabled() {
 		target, err := boltSocksTarget(s.URL)
@@ -37,9 +37,9 @@ func createDriver(ctx context.Context, s *models.PluginSettings, proxyOpts *prox
 			return nil, nil, fmt.Errorf("could not start local socks relay: %w", err)
 		}
 		log.DefaultLogger.Info("routing Bolt through secure SOCKS proxy", "target", target)
-		driver, err := neo4j.NewDriverWithContext("bolt://"+relay.addr(), authTokenFor(s))
+		driver, err := neo4j.NewDriver("bolt://"+relay.addr(), authTokenFor(s))
 		return driver, relay, err
 	}
-	driver, err := neo4j.NewDriverWithContext(s.URL, authTokenFor(s))
+	driver, err := neo4j.NewDriver(s.URL, authTokenFor(s))
 	return driver, nil, err
 }

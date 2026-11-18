@@ -68,12 +68,12 @@ func startEchoServer(t *testing.T) net.Addr {
 				return
 			}
 			go func(c net.Conn) {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				_, _ = io.Copy(c, c)
 			}(conn)
 		}
 	}()
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { _ = ln.Close() })
 	return ln.Addr()
 }
 
@@ -89,7 +89,7 @@ func TestSocksRelayForwardsBothWays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatal(err)
 	}

@@ -77,7 +77,7 @@ func (r *socksRelay) acceptLoop() {
 }
 
 func (r *socksRelay) bridge(client net.Conn) {
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	contextDialer, ok := r.dialer.(proxy.ContextDialer)
 	if !ok {
 		log.DefaultLogger.Error("SOCKS dialer does not support contexts")
@@ -88,7 +88,7 @@ func (r *socksRelay) bridge(client net.Conn) {
 		log.DefaultLogger.Error("SOCKS relay connection failed", "target", r.target, "err", err.Error())
 		return
 	}
-	defer remote.Close()
+	defer func() { _ = remote.Close() }()
 	done := make(chan struct{}, 2)
 	go func() {
 		_, _ = io.Copy(remote, client)

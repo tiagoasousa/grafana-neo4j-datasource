@@ -19,7 +19,7 @@ var (
 // Datasource answers Cypher queries against a Neo4j database over Bolt.
 type Datasource struct {
 	settings *models.PluginSettings
-	driver   neo4j.DriverWithContext
+	driver   neo4j.Driver
 	// relay is non-nil only when the secure SOCKS proxy routes Bolt
 	// through the loopback relay.
 	relay *socksRelay

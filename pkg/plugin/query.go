@@ -30,7 +30,7 @@ func (d *Datasource) runQuery(ctx context.Context, cypher, database string) ([]*
 	// this data source intentionally allows writes (users may run MERGE/SET),
 	// so sessions use write mode, which accepts reads as well.
 	session := d.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: db, AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
+	defer func() { _ = session.Close(ctx) }()
 
 	result, err := session.Run(ctx, cypher, map[string]any{})
 	if err != nil {
