@@ -2,7 +2,10 @@ module github.com/tiagoasousa/neo4j-datasource
 
 go 1.26.5
 
-require github.com/grafana/grafana-plugin-sdk-go v0.300.0
+require (
+	github.com/grafana/grafana-plugin-sdk-go v0.300.0
+	github.com/neo4j/neo4j-go-driver/v6 v6.4.0
+)
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect

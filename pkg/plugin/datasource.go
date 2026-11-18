@@ -2,115 +2,76 @@ package plugin
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"time"
+	"io"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
-	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/tiagoasousa/neo4j-datasource/pkg/models"
 )
 
-// Make sure Datasource implements required interfaces. This is important to do
-// since otherwise we will only get a not implemented error response from plugin in
-// runtime. In this example datasource instance implements backend.QueryDataHandler,
-// backend.CheckHealthHandler interfaces. Plugin should not implement all these
-// interfaces - only those which are required for a particular task.
+// Make sure Datasource implements required interfaces.
 var (
 	_ backend.QueryDataHandler      = (*Datasource)(nil)
 	_ backend.CheckHealthHandler    = (*Datasource)(nil)
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
 
-// NewDatasource creates a new datasource instance.
-func NewDatasource(_ context.Context, _ backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
-	return &Datasource{}, nil
+// Datasource answers Cypher queries against a Neo4j database over Bolt.
+type Datasource struct {
+	settings *models.PluginSettings
+	driver   neo4j.DriverWithContext
+	// relay is non-nil only when the secure SOCKS proxy routes Bolt
+	// through the loopback relay (introduced in a later task).
+	relay io.Closer
 }
 
-// Datasource is an example datasource which can respond to data queries, reports
-// its health and has streaming skills.
-type Datasource struct{}
+// NewDatasource creates a new datasource instance.
+func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+	s, err := models.LoadPluginSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+	driver, err := createDriver(s)
+	if err != nil {
+		return nil, err
+	}
+	return &Datasource{settings: s, driver: driver}, nil
+}
 
-// Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
-// created. As soon as datasource settings change detected by SDK old datasource instance will
-// be disposed and a new one will be created using NewSampleDatasource factory function.
+// Dispose cleans up when settings change.
 func (d *Datasource) Dispose() {
-	// Clean up datasource instance resources.
+	if d.driver != nil {
+		_ = d.driver.Close(context.Background())
+	}
+	if d.relay != nil {
+		_ = d.relay.Close()
+	}
 }
 
 // QueryData handles multiple queries and returns multiple responses.
-// req contains the queries []DataQuery (where each query contains RefID as a unique identifier).
-// The QueryDataResponse contains a map of RefID to the response for each query, and each response
-// contains Frames ([]*Frame).
+// The query pipeline is not implemented yet; each query gets a placeholder
+// error response until the next task wires it up.
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	// create response struct
 	response := backend.NewQueryDataResponse()
-
-	// loop over queries and execute them individually.
 	for _, q := range req.Queries {
-		res := d.query(ctx, req.PluginContext, q)
-
-		// save the response in a hashmap
-		// based on with RefID as identifier
-		response.Responses[q.RefID] = res
+		response.Responses[q.RefID] = backend.ErrDataResponse(backend.StatusInternal, "query pipeline not implemented yet")
 	}
-
 	return response, nil
 }
 
-type queryModel struct{}
-
-func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
-	var response backend.DataResponse
-
-	// Unmarshal the JSON into our queryModel.
-	var qm queryModel
-
-	err := json.Unmarshal(query.JSON, &qm)
-	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("json unmarshal: %v", err.Error()))
+// CheckHealth verifies the driver can reach the server and that the
+// configured database exists (the full query pipeline arrives in the next task).
+func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
+	if err := d.driver.VerifyConnectivity(ctx); err != nil {
+		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: err.Error()}, nil
 	}
-
-	// create data frame response.
-	// For an overview on data frames and how grafana handles them:
-	// https://grafana.com/developers/plugin-tools/introduction/data-frames
-	frame := data.NewFrame("response")
-
-	// add fields.
-	frame.Fields = append(frame.Fields,
-		data.NewField("time", nil, []time.Time{query.TimeRange.From, query.TimeRange.To}),
-		data.NewField("values", nil, []int64{10, 20}),
-	)
-
-	// add the frames to the response.
-	response.Frames = append(response.Frames, frame)
-
-	return response
-}
-
-// CheckHealth handles health checks sent from Grafana to the plugin.
-// The main use case for these health checks is the test button on the
-// datasource configuration page which allows users to verify that
-// a datasource is working as expected.
-func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	res := &backend.CheckHealthResult{}
-	config, err := models.LoadPluginSettings(*req.PluginContext.DataSourceInstanceSettings)
-
-	if err != nil {
-		res.Status = backend.HealthStatusError
-		res.Message = "Unable to load settings"
-		return res, nil
+	// VerifyConnectivity only exercises the server's default database; probe
+	// the configured database so a bad name fails the health check.
+	session := d.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: d.settings.Database, AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+	if _, err := session.Run(ctx, "RETURN 1", nil); err != nil {
+		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: err.Error()}, nil
 	}
-
-	if config.Secrets.ApiKey == "" {
-		res.Status = backend.HealthStatusError
-		res.Message = "API key is missing"
-		return res, nil
-	}
-
-	return &backend.CheckHealthResult{
-		Status:  backend.HealthStatusOk,
-		Message: "Data source is working",
-	}, nil
+	return &backend.CheckHealthResult{Status: backend.HealthStatusOk, Message: "Data source is working"}, nil
 }
