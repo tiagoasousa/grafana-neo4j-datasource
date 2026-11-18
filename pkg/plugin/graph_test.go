@@ -39,6 +39,7 @@ func TestGraphFormat(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
+	skipIfNoNeo4j(t)
 	personEid, relEid, movieEid := probeElementIds(t)
 	t.Logf("probed element ids: person=%q rel=%q movie=%q", personEid, relEid, movieEid)
 
@@ -81,6 +82,7 @@ func TestGraphFormatOptionalFields(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
+	skipIfNoNeo4j(t)
 	cypher := `
 MERGE (n:OptionalFieldTest {name: 'X'})
 SET n.subtitle = 'sub', n.color = 'red', n.mainstat = '42', n.arc__cpu = 5, n.other = 'plain'

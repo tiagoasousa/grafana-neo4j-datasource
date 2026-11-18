@@ -3,8 +3,10 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/tiagoasousa/neo4j-datasource/pkg/models"
@@ -20,10 +22,22 @@ func settingsFor(url, database, username, password string) backend.DataSourceIns
 	}
 }
 
+// skipIfNoNeo4j skips integration tests when no Neo4j is reachable (e.g. CI
+// release builds run the full suite without a database).
+func skipIfNoNeo4j(t *testing.T) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", "localhost:7687", 2*time.Second)
+	if err != nil {
+		t.Skip("Neo4j not reachable at localhost:7687; integration test skipped")
+	}
+	_ = conn.Close()
+}
+
 func TestHealthcheck(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
+	skipIfNoNeo4j(t)
 	cases := []struct {
 		name        string
 		settings    backend.DataSourceInstanceSettings

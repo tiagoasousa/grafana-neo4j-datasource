@@ -90,6 +90,7 @@ func TestTableFormat(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
+	skipIfNoNeo4j(t)
 	_ = dbtype.Node{} // keep the dbtype import honest for future graph tests
 	pid, peid, rid, reid, mid, meid := probeNodeRelIds(t)
 	nodeJSON := fmt.Sprintf(`{"Id":%d,"ElementId":"%s","Labels":["Movie"],"Props":{"released":1999,"tagline":"Welcome to the Real World","title":"The Matrix"}}`, mid, meid)
@@ -148,6 +149,7 @@ func TestQueryDatabaseOverride(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
+	skipIfNoNeo4j(t)
 	// Community Edition has only the default "neo4j" database besides
 	// "system", and the system database rejects user-database Cypher such as
 	// RETURN 1 (Neo.ClientError.Statement.SemanticError), so the override is
