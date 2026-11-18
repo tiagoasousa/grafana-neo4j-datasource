@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Modernize the data source configuration editor to the current Grafana UI
+  pattern (`Stack` + `Field` with label/description, section headers), replacing
+  the legacy `InlineField` form layout. Same settings and PDC toggle; no backend
+  or configuration-schema changes.
+
 ## 1.0.1
 
 - Update @grafana/* dependencies to 13.3.1.
