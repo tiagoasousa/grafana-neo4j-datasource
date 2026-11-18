@@ -26,7 +26,10 @@ func (d *Datasource) runQuery(ctx context.Context, cypher, database string) ([]*
 	if database != "" {
 		db = database
 	}
-	session := d.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: db, AccessMode: neo4j.AccessModeRead})
+	// Auto-commit user Cypher cannot be classified read/write up front, and
+	// this data source intentionally allows writes (users may run MERGE/SET),
+	// so sessions use write mode, which accepts reads as well.
+	session := d.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: db, AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx, cypher, map[string]any{})
@@ -54,8 +57,7 @@ func (d *Datasource) query(ctx context.Context, q backend.DataQuery) backend.Dat
 		return backend.ErrDataResponse(backend.StatusInternal, err.Error())
 	}
 	if qm.Format == formatNodeGraph {
-		// Task 4 replaces this with toGraphResponse(keys, records).
-		return backend.ErrDataResponse(backend.StatusNotImplemented, "node graph format not implemented yet")
+		return toGraphResponse(keys, records)
 	}
 	return toTableResponse(keys, records)
 }
