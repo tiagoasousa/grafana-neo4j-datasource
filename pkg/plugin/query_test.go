@@ -23,8 +23,9 @@ func diffFrames(got, want *data.Frame) string {
 	return cmp.Diff(got, want, data.FrameTestCompareOptions()...)
 }
 
-// runIntegrationQuery runs one cypher query against the local compose Neo4j.
-func runIntegrationQuery(t *testing.T, cypher, format string) backend.DataResponse {
+// newTestDatasource builds a *Datasource against the local compose Neo4j and
+// disposes it when the test ends.
+func newTestDatasource(t *testing.T) *Datasource {
 	t.Helper()
 	settings := settingsFor("neo4j://localhost:7687", "", "neo4j", "Password123")
 	inst, err := NewDatasource(context.Background(), settings)
@@ -32,7 +33,13 @@ func runIntegrationQuery(t *testing.T, cypher, format string) backend.DataRespon
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { inst.(*Datasource).Dispose() })
-	ds := inst.(*Datasource)
+	return inst.(*Datasource)
+}
+
+// runIntegrationQuery runs one cypher query against the local compose Neo4j.
+func runIntegrationQuery(t *testing.T, cypher, format string) backend.DataResponse {
+	t.Helper()
+	ds := newTestDatasource(t)
 	raw, _ := json.Marshal(QueryModel{CypherQuery: cypher, Format: format})
 	return ds.query(context.Background(), backend.DataQuery{RefID: "A", JSON: raw})
 }
@@ -89,5 +96,38 @@ func TestTableFormat(t *testing.T) {
 				t.Fatal(diff)
 			}
 		})
+	}
+}
+
+func TestQueryDatabaseOverride(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	// Community Edition has only the default "neo4j" database besides
+	// "system", and the system database rejects user-database Cypher such as
+	// RETURN 1 (Neo.ClientError.Statement.SemanticError), so the override is
+	// proven by contrast instead: a per-query database must win over both a
+	// broken and a working configured database.
+
+	// (a) The per-query database rescues a query whose data source is
+	// configured against a database that does not exist.
+	settings := settingsFor("neo4j://localhost:7687", "DoesNotExist", "neo4j", "Password123")
+	inst, err := NewDatasource(context.Background(), settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { inst.(*Datasource).Dispose() })
+	poisoned := inst.(*Datasource)
+	rawGood, _ := json.Marshal(QueryModel{CypherQuery: "RETURN 1 AS ok", Format: formatTable, Database: "neo4j"})
+	if res := poisoned.query(context.Background(), backend.DataQuery{RefID: "A", JSON: rawGood}); res.Error != nil {
+		t.Fatalf("per-query database override failed: %v", res.Error)
+	}
+
+	// (b) A per-query database pointing at a database that does not exist
+	// fails even though the data source's default would have worked.
+	ds := newTestDatasource(t)
+	rawBad, _ := json.Marshal(QueryModel{CypherQuery: "RETURN 1 AS ok", Database: "DoesNotExist"})
+	if res := ds.query(context.Background(), backend.DataQuery{RefID: "A", JSON: rawBad}); res.Error == nil {
+		t.Fatal("expected error for non-existent database")
 	}
 }
