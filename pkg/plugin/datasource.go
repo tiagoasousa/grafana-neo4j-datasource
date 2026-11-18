@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"io"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
@@ -22,8 +21,8 @@ type Datasource struct {
 	settings *models.PluginSettings
 	driver   neo4j.DriverWithContext
 	// relay is non-nil only when the secure SOCKS proxy routes Bolt
-	// through the loopback relay (introduced in a later task).
-	relay io.Closer
+	// through the loopback relay.
+	relay *socksRelay
 }
 
 // NewDatasource creates a new datasource instance.
@@ -32,11 +31,15 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	if err != nil {
 		return nil, err
 	}
-	driver, err := createDriver(s)
+	httpOpts, err := settings.HTTPClientOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &Datasource{settings: s, driver: driver}, nil
+	driver, relay, err := createDriver(ctx, s, httpOpts.ProxyOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &Datasource{settings: s, driver: driver, relay: relay}, nil
 }
 
 // Dispose cleans up when settings change.
@@ -45,7 +48,7 @@ func (d *Datasource) Dispose() {
 		_ = d.driver.Close(context.Background())
 	}
 	if d.relay != nil {
-		_ = d.relay.Close()
+		d.relay.close()
 	}
 }
 
