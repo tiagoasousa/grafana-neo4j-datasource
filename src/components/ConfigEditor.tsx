@@ -34,11 +34,15 @@ export function ConfigEditor(props: Props) {
   // and is >= 10 (the official Grafana PDC gating pattern).
   const secureSocksSupported =
     config.featureToggles['secureSocksDSProxyEnabled' as keyof FeatureToggles] && gte(config.buildInfo.version, '10.0.0');
+  // Grafana Cloud sets this when it injects the PDC connection/tunnel selector.
+  const pdcInjected = Boolean(jsonData.pdcInjected);
 
   const headers: SidebarHeader[] = [
     { label: 'Connection', id: 'connection' },
     { label: 'Authentication', id: 'authentication' },
-    ...(secureSocksSupported ? [{ label: 'Private data source connect', id: 'pdc', isOptional: true }] : []),
+    ...(secureSocksSupported || pdcInjected
+      ? [{ label: 'Private data source connect', id: 'pdc', isOptional: true }]
+      : []),
     { label: 'Save & test', id: selectors.pages.DataSource.saveAndTest },
   ];
 

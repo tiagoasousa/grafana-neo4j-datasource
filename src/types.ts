@@ -21,6 +21,8 @@ export interface MyDataSourceOptions extends DataSourceJsonData {
   database?: string;
   username?: string;
   enableSecureSocksProxy?: boolean;
+  // Set by Grafana Cloud when it injects the PDC connection/tunnel selector UI.
+  pdcInjected?: boolean;
 }
 
 export interface MySecureJsonData {
