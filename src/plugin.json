@@ -26,7 +26,16 @@
         "url": "https://github.com/tiagoasousa/grafana-neo4j-datasource"
       }
     ],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name": "Configuration",
+        "path": "img/screenshot-config.png"
+      },
+      {
+        "name": "Node Graph",
+        "path": "img/screenshot-nodegraph.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },

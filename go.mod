@@ -1,6 +1,6 @@
 module github.com/tiagoasousa/neo4j-datasource
 
-go 1.26.5
+go 1.26.11
 
 require (
 	github.com/google/go-cmp v0.7.0

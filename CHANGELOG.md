@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4
+
+- Build with Go 1.26.11 to address standard-library security advisories.
+- Add plugin catalog screenshots (configuration page and Node Graph panel).
+
 ## 1.0.3
 
 - Config editor redesigned to the modern Grafana layout: a sticky left sidebar
